@@ -5,10 +5,21 @@ class Player{
         this.speed = 2.5;
         this.size = 20;
 
+        //RPG Stats
+        this.level = 1;
+        this.xp = 0;
+        this.xpToNextLevel = 100;
+        this.currency = 0;
+
+        //timer popup for level up
+        this.levelUpTimer = 0;
+
         // Combat Stats
         this.hp = 100;
         this.maxHp = 100;
         this.invincibilityFramesTimer = 0;
+        this.damage = 10;
+        this.projectileCount = 1;
 
         // Weapon Stats
         this.fireRate = 30; // Frames between shots (lower = faster)
@@ -19,7 +30,6 @@ class Player{
     update() {
         this.handleMovement();
         this.handleShooting();
-
         // Decrease invincibility frames
         if (this.invincibilityFramesTimer > 0) {
             this.invincibilityFramesTimer--;
@@ -28,7 +38,6 @@ class Player{
 
     show() {
         push();
-
         // Flash blue if invincible
         if (this.invincibilityFramesTimer > 0) {
             tint("red");
@@ -40,6 +49,28 @@ class Player{
         // Draw image at 0,0 because we already translated there
         image(playerImg, 0, 0, this.size * 3, this.size * 3);
         pop();
+    }
+
+    gainXP(amount) {
+        this.xp += amount;
+        // Level Up Check
+        while (this.xp >= this.xpToNextLevel) {
+            this.levelUp();
+        }
+    }
+
+    levelUp() {
+        this.level++;
+        this.xp -= this.nextLevelXp;
+        this.nextLevelXp = Math.floor(this.nextLevelXp * 1.5); // Harder to reach next level
+
+        // --- REWARDS ---
+        this.maxHp += 5;        // Health Bar gets bigger
+        this.hp = this.maxHp;    // Full Heal
+        this.damage += 5;        // More Damage
+
+        // Show Level Up Popup
+        this.levelUpTimer = 180; // Show for 3 seconds at 60 FPS
     }
 
     takeDamage(amount) {

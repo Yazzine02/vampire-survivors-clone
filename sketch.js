@@ -1,13 +1,14 @@
 let player;
 let enemies = []; // The player class looks at this
 let bullets = []; // The player class pushes to this
+let drops = [];   // Future use for XP/Gems
 
 function preload() {
     // Asset loading
     playerImg = loadImage('assets/Sorcerer.png');
     enemyImg = loadImage('assets/Zombie.png');
     bulletImg = loadImage('assets/MagicMissile.png');
-    bgImg = loadImage('assets/DesertBackground.png');
+    bgImg = loadImage('assets/Sand.jpg');
 }
 
 function setup() {
@@ -62,8 +63,12 @@ function draw() {
             player.takeDamage(5); // Enemy deals 5 damage on contact
         }
         if (e.isDead) {
+            // Drop logic first
+            // 80% chance to drop XP, 20% chance to drop Gem
+            let dropType = random() < 0.8 ? "XP" : "GEM";
+            drops.push(new Drop(e.pos.x, e.pos.y, dropType));
+            // Remove enemy from array
             enemies.splice(i, 1);
-            // TODO: Drop Gem here later
         }
     }
     // 4. Bullets
@@ -84,6 +89,21 @@ function draw() {
             bullets.splice(i, 1);
         }
     }
+    // 5. Drops
+    for (let i = drops.length - 1; i >= 0; i--) {
+        let d = drops[i];
+        d.update(player);
+        d.show();
+        // Check Collection
+        if (dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y) < player.size) {
+            if (d.type === "XP") {
+                player.gainXP(d.value);
+            } else {
+                player.currency += 1; // Add to wallet
+            }
+            drops.splice(i, 1);
+        }
+    }
 
     pop(); // End Camera Translation
     // --- HUD ---
@@ -96,26 +116,92 @@ function draw() {
 }
 
 function drawUI() {
-    // Draw Health Bar
+    // --- 1. HEALTH BAR (Top Left) ---
     push();
     noStroke();
 
-    // Background Bar (Black/Grey)
+    // Background (Dark Grey)
     fill(50);
     rect(20, 20, 200, 20);
 
-    // Foreground Bar (Red)
-    // Width is mapped to current HP
+    // Foreground (Red) - Mapped Current HP to Max HP
     let hpWidth = map(player.hp, 0, player.maxHp, 0, 200);
+    // Clamp the value so it doesn't draw backwards if HP < 0
+    hpWidth = constrain(hpWidth, 0, 200);
+
     fill(255, 50, 50);
     rect(20, 20, hpWidth, 20);
 
-    // White Border
+    // Border
     noFill();
     stroke(255);
     strokeWeight(2);
     rect(20, 20, 200, 20);
     pop();
+
+    // --- 2. XP BAR (Below Health) ---
+    push();
+    noStroke();
+
+    // Background (Dark Grey)
+    fill(50);
+    rect(20, 50, 200, 10);
+
+    // Foreground (Cyan) - Mapped Current XP to Next Level Goal
+    let xpWidth = map(player.xp, 0, player.nextLevelXp, 0, 200);
+    xpWidth = constrain(xpWidth, 0, 200);
+
+    fill(0, 255, 255);
+    rect(20, 50, xpWidth, 10);
+
+    // Border
+    noFill();
+    stroke(255);
+    strokeWeight(1);
+    rect(20, 50, 200, 10);
+    pop();
+
+    // --- 3. TEXT STATS ---
+    push();
+    fill(255);
+    textSize(16);
+    textStyle(BOLD);
+    textAlign(LEFT, TOP);
+
+    // Add a black outline to text for readability
+    stroke(0);
+    strokeWeight(3);
+    text(`LVL: ${player.level}`, 230, 50);
+
+    fill(255, 215, 0); // Gold color
+    text(`GEMS: ${player.currency}`, 230, 20);
+    pop();
+
+    // --- 4. LEVEL UP POPUP ---
+    // Only draw this if the timer is active
+    if (player.levelUpTimer > 0) {
+        push();
+        textAlign(CENTER, CENTER);
+        textSize(60);
+        textStyle(BOLD);
+
+        // Gold Text with Black Outline
+        stroke(0);
+        strokeWeight(6);
+        fill(255, 215, 0);
+
+        text("LEVEL UP!", width / 2, height / 2 - 100);
+
+        // Optional: Subtitle showing new stats
+        // textSize(24);
+        // fill(255);
+        // strokeWeight(3);
+        // text("Max HP Up!  +1 Missile!", width / 2, height / 2 - 50);
+
+        player.levelUpTimer -= 10; // Decrease timer
+
+        pop();
+    }
 }
 
 function drawGameOver() {
@@ -133,7 +219,7 @@ function drawGameOver() {
     text("Git good by refreshing the page", width / 2, height / 2 + 40);
     pop();
 }
-/*
+
     //This creates Obvious Background Seams
     // Creates a [A] [A] pattern that seems too obvious when scrolling
     function drawInfiniteBackground() {
@@ -156,9 +242,10 @@ function drawGameOver() {
             }
         }
     }
-    */
+
 //The fix to the seams is to use a [A][E] pattern where E is the reflected image of A
 // Inside sketch.js
+/*
 function drawInfiniteBackground() {
     let tileSize = 1024;
 
@@ -187,3 +274,4 @@ function drawInfiniteBackground() {
         }
     }
 }
+*/
