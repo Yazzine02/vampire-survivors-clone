@@ -9,9 +9,9 @@ class Archer extends Enemy {
         this.maxSpeed = 1.5; // Slower
         
         // AI Stats
-        this.shootingRange = 350;
+        this.shootingRange = 250;
         this.keepAwayRange = 200; // Stop and shoot, but flee if player gets closer
-        this.fireRate = 90; // Shoots every 1.5 seconds
+        this.fireRate = 180; // Shoots every 1.5 seconds
         this.fireTimer = this.fireRate;
     }
 
@@ -67,6 +67,6 @@ class Archer extends Enemy {
         // It's added to the global 'bullets' array, which is a bit messy.
         // A better system would pass 'bullets' into the update loop.
         // For now, let's just add it to 'bullets' (the global array)
-        bullets.push(new Arrow(this.pos.x, this.pos.y, player.pos));
+        arrows.push(new Arrow(this.pos.x, this.pos.y, player.pos));
     }
 }

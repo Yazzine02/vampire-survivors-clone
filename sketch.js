@@ -3,12 +3,16 @@ let spawner;
 let enemies = []; // The player class looks at this
 let bullets = []; // The player class pushes to this
 let drops = [];   // Future use for XP/Gems
+let arrows = []; // For archer enemy projectiles
 // MAP DEFINITION
 let terrain=[]; // For future obstacles
+// brush radius for obstacle editor
+let debugRadius=50;
 
 
 function preload() {
     // Asset loading
+    mapImg = loadImage('assets/Map.png');
     playerImg = loadImage('assets/Sorcerer.png');
     enemyImg = loadImage('assets/Zombie.png');
     bulletImg = loadImage('assets/MagicMissile.png');
@@ -16,16 +20,45 @@ function preload() {
     monkImg = loadImage('assets/Monk.png');
     knightImg = loadImage('assets/Knight.png');
     lancerImg = loadImage('assets/Lancer.png');
+    archerImg = loadImage('assets/Archer.png');
+    arrowImg = loadImage('assets/Arrow.png');
 }
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
     imageMode(CENTER);
-    player = new Player(width / 2, height / 2);
+    player = new Player(mapImg.width / 2, mapImg.height / 2);
     spawner = new Spawner();
 
     // Give player a starting weapon
     player.weapons.push(new MagicMissileWeapon());
+
+    // Defining the terrain obstacles
+    terrain.push(new Obstacle(171,261,45));
+    terrain.push(new Obstacle(283, 315, 74));
+    terrain.push(new Obstacle(281, 205, 45));
+    terrain.push(new Obstacle(377, 28, 25));
+    terrain.push(new Obstacle(635, 216, 60));
+    terrain.push(new Obstacle(877, 219, 55));
+    terrain.push(new Obstacle(759, 169, 105));
+    terrain.push(new Obstacle(489, 548, 70));
+    terrain.push(new Obstacle(1213, 473, 20));
+    terrain.push(new Obstacle(1221, 214, 20));
+    terrain.push(new Obstacle(1378, 299, 40));
+    terrain.push(new Obstacle(1348, 234, 75));
+    terrain.push(new Obstacle(1349, 141, 50));
+    terrain.push(new Obstacle(220, 967, 45));
+    terrain.push(new Obstacle(733, 882, 75));
+    terrain.push(new Obstacle(734, 786, 50));
+    terrain.push(new Obstacle(934, 758, 20));
+    terrain.push(new Obstacle(1205, 844, 40));
+    terrain.push(new Obstacle(1373, 722, 70));
+    terrain.push(new Obstacle(1374, 625, 55));
+    terrain.push(new Obstacle(327, 1259, 40));
+    terrain.push(new Obstacle(220, 1253, 70));
+    terrain.push(new Obstacle(223, 1157, 50));
+    terrain.push(new Obstacle(1164, 1170, 45));
+
 }
 
 /*
@@ -53,12 +86,22 @@ function draw() {
     push();
     // Move the world relative to player
     translate(width / 2 - player.pos.x, height / 2 - player.pos.y);
+    //draw map
+    image(mapImg, mapImg.width / 2, mapImg.height / 2, mapImg.width, mapImg.height);
+    //drawInfiniteBackground();
 
-    drawInfiniteBackground();
+    //Draw Terrain Obstacles
+    for(let obs of terrain){
+        obs.show();
+    }
 
     // --- GAME UPDATE LOOP ---
     // 1. Player
-    player.update();
+    player.update(terrain);
+    // Constrain player to map boundaries
+    let playerRadius = player.size / 2;
+    player.pos.x = constrain(player.pos.x, playerRadius, mapImg.width - playerRadius);
+    player.pos.y = constrain(player.pos.y, playerRadius, mapImg.height - playerRadius);
     player.show();
     /*
     ////Deprecated simple spawner logic
@@ -74,7 +117,11 @@ function draw() {
     for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i];
         // PASS THE ENTIRE ARRAY for separation logic
-        e.update(player, enemies);
+        e.update(player, enemies, terrain);
+        // Constrain enemies to map boundaries
+        let enemyRadius = e.r;
+        e.pos.x = constrain(e.pos.x, enemyRadius, mapImg.width - enemyRadius);
+        e.pos.y = constrain(e.pos.y, enemyRadius, mapImg.height - enemyRadius);
         e.show();
 
         // Check player collision for damage
@@ -124,10 +171,31 @@ function draw() {
             drops.splice(i, 1);
         }
     }
+    //7.Arrows
+    for(let i=arrows.length-1;i>=0;i--){
+        let a=arrows[i];
+        a.update();
+        a.show();
+
+        // Check collision with player
+        if(a.hits(player)){
+
+            // BUGFIX: Pass the whole arrow 'a', not 'a.damage'
+            player.takeDamage(a);
+
+            arrows.splice(i,1); // Your code here is correct! This will now run.
+        }
+        // Clean up stray arrows
+        else if (a.pos.dist(player.pos) > 1000) {
+            arrows.splice(i, 1);
+        }
+    }
 
     pop(); // End Camera Translation
     // --- HUD ---
     drawUI();
+    // Draw the red brush on top of the game, at the mouse
+    drawDebugBrush(); // (Add this line)
     // --- GAME OVER CHECK ---
     if (player.hp <= 0) {
         drawGameOver();
@@ -260,6 +328,61 @@ function drawGameOver() {
             }
         }
     }
+
+function keyPressed() {
+    // Use '1' and '2' keys to change the brush size
+    if (key === '1') {
+        debugRadius = max(10, debugRadius - 5); // Decrease size, min 10
+        console.log("Debug radius set to: " + debugRadius);
+    }
+    if (key === '2') {
+        debugRadius += 5; // Increase size
+        console.log("Debug radius set to: " + debugRadius);
+    }
+}
+
+function mousePressed() {
+    // 1. Calculate the mouse's position in the GAME WORLD, not the screen
+    // This formula "un-translates" the mouse coordinates
+    let worldX = round(mouseX - width / 2 + player.pos.x);
+    let worldY = round(mouseY - height / 2 + player.pos.y);
+
+    // 2. Print the exact line of code to the console (F12)
+    let codeLine = `terrain.push(new Obstacle(${worldX}, ${worldY}, ${debugRadius}));`;
+    console.log(codeLine);
+
+    // Optional: Prevents player from shooting while placing obstacles
+    // return false;
+}
+
+function drawDebugBrush() {
+    push();
+    fill(255, 0, 0, 100); // Semi-transparent red
+    stroke(255, 0, 0);
+    strokeWeight(2);
+    // Draw the circle at the mouse's screen position
+    circle(mouseX, mouseY, debugRadius * 2);
+    pop();
+}
+
+function drawPauseScreen() {
+    push();
+    // This draws in SCREEN space, not world space
+
+    // --- DELETE THESE TWO LINES ---
+    // fill(0, 150); // Dark semi-transparent overlay
+    // rect(0, 0, width, height);
+    // ---
+
+    textAlign(CENTER, CENTER);
+    fill(255);
+    textSize(64);
+    textStyle(BOLD);
+    stroke(0);
+    strokeWeight(6);
+    text("PAUSED", width / 2, height / 2);
+    pop();
+}
 
 //The fix to the seams is to use a [A][E] pattern where E is the reflected image of A
 // Inside sketch.js

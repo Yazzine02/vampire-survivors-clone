@@ -28,7 +28,16 @@ class Spawner {
 
         if (roll < 0.1) { // 10% chance for a Worm
             enemies.push(new WormEnemy(x, y));
-        } else { // 90% chance for a regular Zombie
+        }else if (0.1<= roll < 0.25) {// 15% chance for a knight
+            enemies.push(new Knight(x, y));
+        }else if (0.25<= roll < 0.40){
+            enemies.push(new Lancer(x, y));
+        }else if (0.40<= roll < 0.55){
+            enemies.push(new Monk(x, y));
+        }else if (0.55<= roll < 0.70){
+            enemies.push(new Archer(x, y));
+        }
+        else { // 90% chance for a regular Zombie
             enemies.push(new Enemy(x, y));
         }
     }

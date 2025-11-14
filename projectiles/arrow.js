@@ -6,7 +6,7 @@ class Arrow {
         
         // Calculate velocity ONCE
         this.vel = p5.Vector.sub(targetPos, this.pos);
-        this.vel.setMag(10); // Flies at speed 10
+        this.vel.setMag(5); // Flies at speed 10
     }
     
     update() {

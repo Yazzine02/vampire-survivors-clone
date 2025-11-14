@@ -15,10 +15,11 @@ class Enemy {
         this.img = enemyImg; // Default enemy image
     }
 
-    update(player, enemies) {
+    update(player, enemies, terrain) {
         // --- AI DECISION MAKING ---
         let seekForce = this.seek(player.pos);
         let separateForce = this.separate(enemies);
+        let avoidForce = this.avoid(terrain);
 
         // Weight the forces:
         // We want them to chase the player, but PRIORITY is personal space.
@@ -74,6 +75,35 @@ class Enemy {
             sum.setMag(this.maxSpeed);
             let steer = p5.Vector.sub(sum, this.vel);
             steer.limit(this.maxForce); // Don't separate TOO abruptly
+            return steer;
+        }
+        return createVector(0, 0);
+    }
+    // 3. AVOID: The drive to not hit obstacles (terrain)
+    avoid(obstacles) {
+        // This perception radius should be larger than separation
+        // It's how far ahead the enemy "looks" for obstacles
+        let perceptionRadius = this.r * 6;
+        let sum = createVector(0, 0);
+        let count = 0;
+        for (let obs of obstacles) {
+            let d = p5.Vector.dist(this.pos, obs.pos);
+
+            // If the obstacle is within our perception radius
+            if ((d > 0) && (d < perceptionRadius + obs.r)) {
+                // Calculate a repulsion force, stronger the closer we are
+                let diff = p5.Vector.sub(this.pos, obs.pos);
+                diff.normalize();
+                diff.div(d); // Weigh by distance
+                sum.add(diff);
+                count++;
+            }
+        }
+        if (count > 0) {
+            sum.div(count); // Average direction
+            sum.setMag(this.maxSpeed);
+            let steer = p5.Vector.sub(sum, this.vel);
+            steer.limit(this.maxForce * 2.0); // Allow for strong turns
             return steer;
         }
         return createVector(0, 0);

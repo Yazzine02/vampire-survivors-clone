@@ -26,7 +26,6 @@ class Player{
 
     update() {
         this.handleMovement();
-        //this.handleShooting();
         // Decrease invincibility frames
         if (this.invincibilityFramesTimer > 0) {
             this.invincibilityFramesTimer--;
@@ -82,9 +81,6 @@ class Player{
         this.maxHp += 5;        // Health Bar gets bigger
         this.hp = this.maxHp;    // Full Heal
         this.damage += 5;        // More Damage
-        if(this.level % 3 === 0) {
-            this.projectileCount += 1; // More Projectiles every 3 levels
-        }
 
         // Show Level Up Popup
         this.levelUpTimer = 180; // Show for 3 seconds at 60 FPS
@@ -120,6 +116,28 @@ class Player{
         this.pos.add(this.vel);
         //add knockback velocity
         this.pos.add(this.knockbackVel);
+        //Check for obstacle collisions
+        this.checkObstacleCollisions(terrain);
+    }
+
+    checkObstacleCollisions(terrain){
+        for (let obs of terrain) {
+            let d = dist(this.pos.x, this.pos.y, obs.pos.x, obs.pos.y);
+            let playerRadius = this.size / 2;
+
+            // Check if we are overlapping
+            if (d < playerRadius + obs.r) {
+                // --- Collision! ---
+                // 1. Get the vector pointing FROM the obstacle TO the player
+                let pushback = p5.Vector.sub(this.pos, obs.pos);
+                // 2. Set its magnitude to be the "correct" distance
+                let correctDistance = playerRadius + obs.r;
+                pushback.setMag(correctDistance);
+                // 3. Set the player's new position
+                // (Obstacle's center + the pushback vector)
+                this.pos = p5.Vector.add(obs.pos, pushback);
+            }
+        }
     }
 
     handleShooting() {

@@ -53,7 +53,7 @@ class MagicMissileWeapon extends Weapon {
         
         // This is your player's old level up logic
         this.damage += 5;
-        if (this.level % 5 === 0) { // Your 5-level logic
+        if (this.level % 3 === 0) { // Your 5-level logic
             this.projectileCount++;
         }
     }
