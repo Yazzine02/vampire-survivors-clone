@@ -4,11 +4,15 @@ class Enemy {
         this.vel = createVector(0, 0);
         this.acc = createVector(0, 0);
 
+        this.damage = 15;
+
         this.maxSpeed = 0.5;  // Slower than player (usually)
         this.maxForce = 0.1; // How fast they can change direction
         this.r = 15;        // Radius/Size
         this.hp = 30;       // Health Points
         this.isDead = false;
+
+        this.img = enemyImg; // Default enemy image
     }
 
     update(player, enemies) {
@@ -81,7 +85,7 @@ class Enemy {
         // Optional: Flip sprite if moving left
         if (this.vel.x < 0) scale(-1, 1);
         // Draw Undead Sprite
-        image(enemyImg, 0, 0, this.r * 3, this.r * 3);
+        image(this.img, 0, 0, this.r * 3, this.r * 3);
 
         pop();
     }

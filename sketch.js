@@ -1,7 +1,11 @@
 let player;
+let spawner;
 let enemies = []; // The player class looks at this
 let bullets = []; // The player class pushes to this
 let drops = [];   // Future use for XP/Gems
+// MAP DEFINITION
+let terrain=[]; // For future obstacles
+
 
 function preload() {
     // Asset loading
@@ -9,14 +13,23 @@ function preload() {
     enemyImg = loadImage('assets/Zombie.png');
     bulletImg = loadImage('assets/MagicMissile.png');
     bgImg = loadImage('assets/Sand.jpg');
+    monkImg = loadImage('assets/Monk.png');
+    knightImg = loadImage('assets/Knight.png');
+    lancerImg = loadImage('assets/Lancer.png');
 }
 
 function setup() {
     createCanvas(windowWidth, windowHeight);
     imageMode(CENTER);
     player = new Player(width / 2, height / 2);
+    spawner = new Spawner();
+
+    // Give player a starting weapon
+    player.weapons.push(new MagicMissileWeapon());
 }
 
+/*
+//Deprecated simple spawner function
 function spawnEnemy(){
     // Pick a random angle
     let angle = random(TWO_PI);
@@ -31,6 +44,7 @@ function spawnEnemy(){
 
     enemies.push(new Enemy(x, y));
 }
+*/
 
 function draw() {
     background(0);
@@ -46,10 +60,16 @@ function draw() {
     // 1. Player
     player.update();
     player.show();
-    // 2. Spawner
-    // Simple Spawner: Add 1 enemy every 60 frames (1 second)
+    /*
+    ////Deprecated simple spawner logic
     if (frameCount % 60 === 0)spawnEnemy();
-    // 3. Enemies
+    */
+    // 2. Weapons
+    player.updateWeapons(enemies, bullets);
+    player.drawWeapons();
+    // 3. Spawner
+    spawner.update(player);
+    // 4. Enemies
     // Update Enemies
     for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i];
@@ -60,7 +80,7 @@ function draw() {
         // Check player collision for damage
         let d = dist(e.pos.x, e.pos.y, player.pos.x, player.pos.y);
         if (d < e.r + player.size / 2) {
-            player.takeDamage(5); // Enemy deals 5 damage on contact
+            player.takeDamage(e);
         }
         if (e.isDead) {
             // Drop logic first
@@ -71,7 +91,7 @@ function draw() {
             enemies.splice(i, 1);
         }
     }
-    // 4. Bullets
+    // 5. Bullets
     // Update Bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
@@ -89,7 +109,7 @@ function draw() {
             bullets.splice(i, 1);
         }
     }
-    // 5. Drops
+    // 6. Drops
     for (let i = drops.length - 1; i >= 0; i--) {
         let d = drops[i];
         d.update(player);
@@ -148,7 +168,7 @@ function drawUI() {
     rect(20, 50, 200, 10);
 
     // Foreground (Cyan) - Mapped Current XP to Next Level Goal
-    let xpWidth = map(player.xp, 0, player.nextLevelXp, 0, 200);
+    let xpWidth = map(player.xp, 0, player.xpToNextLevel, 0, 200);
     xpWidth = constrain(xpWidth, 0, 200);
 
     fill(0, 255, 255);
@@ -197,8 +217,6 @@ function drawUI() {
         // fill(255);
         // strokeWeight(3);
         // text("Max HP Up!  +1 Missile!", width / 2, height / 2 - 50);
-
-        player.levelUpTimer -= 10; // Decrease timer
 
         pop();
     }

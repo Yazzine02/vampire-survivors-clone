@@ -2,6 +2,7 @@ class Player{
     constructor(x, y) {
         this.pos = createVector(x, y);
         this.vel = createVector(0, 0);
+        this.knockbackVel = createVector(0, 0);
         this.speed = 2.5;
         this.size = 20;
 
@@ -18,21 +19,34 @@ class Player{
         this.hp = 100;
         this.maxHp = 100;
         this.invincibilityFramesTimer = 0;
-        this.damage = 10;
-        this.projectileCount = 1;
 
-        // Weapon Stats
-        this.fireRate = 30; // Frames between shots (lower = faster)
-        this.fireTimer = 0;
-        this.range = 300;   // How far the player can "see" enemies
+        // Weapons
+        this.weapons = [];
     }
 
     update() {
         this.handleMovement();
-        this.handleShooting();
+        //this.handleShooting();
         // Decrease invincibility frames
         if (this.invincibilityFramesTimer > 0) {
             this.invincibilityFramesTimer--;
+        }
+        if(this.levelUpTimer > 0){
+            this.levelUpTimer--;
+        }
+        // Apply knockback velocity (decays over time)
+        this.knockbackVel.mult(0.9); // Friction
+    }
+
+    updateWeapons(enemies, bullets) {
+        for (let weapon of this.weapons) {
+            weapon.update(this, enemies, bullets);
+        }
+    }
+
+    drawWeapons() {
+        for (let weapon of this.weapons) {
+            weapon.show(this);
         }
     }
 
@@ -61,23 +75,35 @@ class Player{
 
     levelUp() {
         this.level++;
-        this.xp -= this.nextLevelXp;
-        this.nextLevelXp = Math.floor(this.nextLevelXp * 1.5); // Harder to reach next level
+        this.xp -= this.xpToNextLevel;
+        this.xpToNextLevel += 20; // Increase XP needed for next level
 
         // --- REWARDS ---
         this.maxHp += 5;        // Health Bar gets bigger
         this.hp = this.maxHp;    // Full Heal
         this.damage += 5;        // More Damage
+        if(this.level % 3 === 0) {
+            this.projectileCount += 1; // More Projectiles every 3 levels
+        }
 
         // Show Level Up Popup
         this.levelUpTimer = 180; // Show for 3 seconds at 60 FPS
+
+        // tell weapons to level up
+        for (let weapon of this.weapons) {
+            weapon.levelUp();
+        }
     }
 
-    takeDamage(amount) {
+    takeDamage(enemy) {
         // take damage only if not invincible
         if( this.invincibilityFramesTimer <= 0 ) {
-            this.hp -= amount;
+            this.hp -= enemy.damage;
             this.invincibilityFramesTimer = 60;
+            // Apply knockback velocity
+            let knockbackDir = p5.Vector.sub(this.pos, enemy.pos);
+            knockbackDir.normalize();
+            this.knockbackVel.set(knockbackDir.mult(10));
         }
     }
 
@@ -92,6 +118,8 @@ class Player{
         // Normalize so diagonal movement isn't faster
         this.vel.setMag(this.speed);
         this.pos.add(this.vel);
+        //add knockback velocity
+        this.pos.add(this.knockbackVel);
     }
 
     handleShooting() {
@@ -102,37 +130,37 @@ class Player{
         }
 
         // 2. Find the nearest enemy
-        let target = this.findNearestEnemy();
-
-        // 3. If target exists and is close enough, Shoot!
-        if (target) {
-            this.shoot(target);
-            this.fireTimer = this.fireRate; // Reset Cooldown
+        let targets = this.findNearestEnemy(this.projectileCount);
+        // 3. If an enemy is found within range, shoot
+        if(targets.length > 0){
+            for(let t of targets){
+                this.shoot(t);
+            }
+            this.fireTimer = this.fireRate;
         }
     }
 
-    findNearestEnemy() {
-        let closestEnemy = null;
-        let closestDist = Infinity;
-
-        // 'enemies' is your global array of enemy objects
-        for (let enemy of enemies) {
-            let d = dist(this.pos.x, this.pos.y, enemy.pos.x, enemy.pos.y);
-
-            // Check if it's the closest AND within range
-            if (d < closestDist && d < this.range) {
-                closestDist = d;
-                closestEnemy = enemy;
-            }
-        }
-        return closestEnemy;
+    findNearestEnemy(count) {
+        //Sort ennemies by distance
+        let sortedEnemies = [...enemies].sort((a, b) => {
+            let dA = p5.Vector.dist(this.pos, a.pos);
+            let dB = p5.Vector.dist(this.pos, b.pos);
+            return dA - dB;
+        });
+        //Filter enemies within range
+        let validTargets = sortedEnemies.filter(e => {
+            let d = p5.Vector.dist(this.pos, e.pos);
+            return d <= this.range;
+        });
+        //Return up to 'count' nearest enemies
+        return validTargets.slice(0, count);
     }
 
     shoot(target) {
         // Create a bullet vector pointing at the enemy
         // Since you have AI behaviors, you can make the bullet 'Seek' later.
         // For now, we just spawn a Bullet object.
-
-        bullets.push(new Bullet(this.pos.x, this.pos.y, target));
+        let b = new Bullet(this.pos.x, this.pos.y, target, this.damage);
+        bullets.push(b);
     }
 }
