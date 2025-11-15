@@ -195,7 +195,7 @@ function draw() {
     // --- HUD ---
     drawUI();
     // Draw the red brush on top of the game, at the mouse
-    drawDebugBrush(); // (Add this line)
+    //drawDebugBrush(); // (Add this line)
     // --- GAME OVER CHECK ---
     if (player.hp <= 0) {
         drawGameOver();
@@ -305,7 +305,7 @@ function drawGameOver() {
     text("Git good by refreshing the page", width / 2, height / 2 + 40);
     pop();
 }
-
+/*
     //This creates Obvious Background Seams
     // Creates a [A] [A] pattern that seems too obvious when scrolling
     function drawInfiniteBackground() {

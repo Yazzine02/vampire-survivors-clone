@@ -16,16 +16,24 @@ class Archer extends Enemy {
     }
 
     // OVERRIDE the update method for special AI
-    update(player, enemies) {
+    update(player, enemies, terrain) {
         this.fireTimer--;
         
         // --- AI Decision Making ---
         let d = dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y);
 
+        // --- 1. SEPARATION (Always do this) ---
         let separateForce = this.separate(enemies);
-        separateForce.mult(2.0); // Always try to separate from other enemies
+        separateForce.mult(2.0);
         this.applyForce(separateForce);
 
+        // --- 2. AVOIDANCE (Always do this) ---
+        // Use the INHERITED avoid function
+        let avoidForce = this.avoid(terrain, player.pos);
+        avoidForce.mult(3.0); // Give it high priority
+        this.applyForce(avoidForce);
+
+        // --- 3. ACTION (Seek, Flee, or Shoot) ---
         if (d > this.shootingRange) {
             // 1. TOO FAR: Seek the player
             let seekForce = this.seek(player.pos);

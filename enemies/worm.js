@@ -32,10 +32,21 @@ class WormEnemy {
     // A Worm has all the same methods as a regular Enemy,
     // so 'sketch.js' can treat them the same!
     
-    update(player) {
+    update(player,enemies, terrain) {
         // 1. Update Head (using seek)
-        this.seek(player.pos);
-        
+        let seekForce = this.seek(player.pos);
+        let separateForce = this.separate(enemies);
+        let avoidForce = this.avoid(terrain, player.pos);
+
+        // Weight forces
+        seekForce.mult(1.0);
+        separateForce.mult(2.0); // Don't crowd other enemies
+        avoidForce.mult(5.0);    // Avoid obstacles strongly
+
+        this.applyForce(seekForce);
+        this.applyForce(separateForce);
+        this.applyForce(avoidForce);
+
         this.vel.add(this.acc);
         this.vel.limit(this.maxSpeed);
         this.headPos.add(this.vel);
@@ -89,13 +100,132 @@ class WormEnemy {
         }
     }
 
+    applyForce(force) {
+        this.acc.add(force);
+    }
+
     // Basic seek behavior for the head
     seek(target) {
         let desired = p5.Vector.sub(target, this.headPos);
         desired.setMag(this.maxSpeed);
         let steer = p5.Vector.sub(desired, this.vel);
         steer.limit(this.maxForce);
-        this.acc.add(steer);
+        return steer;
+    }
+    separate(enemies) {
+        let desiredSeparation = this.r * 4; // Use worm's radius
+        let sum = createVector(0, 0);
+        let count = 0;
+
+        for (let other of enemies) {
+            // Use .pos for compatibility (worm has .pos, enemy has .pos)
+            let d = p5.Vector.dist(this.headPos, other.pos);
+
+            // If they are too close (and not me)
+            if ((d > 0) && (d < desiredSeparation)) {
+                let diff = p5.Vector.sub(this.headPos, other.pos);
+                diff.normalize();
+                diff.div(d);
+                sum.add(diff);
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            sum.div(count);
+            sum.setMag(this.maxSpeed);
+            let steer = p5.Vector.sub(sum, this.vel);
+            steer.limit(this.maxForce);
+            return steer;
+        }
+        return createVector(0, 0);
+    }
+
+    /*
+    // This is just like the avoid function we have seen in class, that i believe is not good enough
+    // basically because the enemy can get stuck on corners
+    avoid(obstacles) {
+        let perceptionRadius = this.r * 6;
+        let sum = createVector(0, 0);
+        let count = 0;
+        for (let obs of obstacles) {
+            let d = p5.Vector.dist(this.headPos, obs.pos);
+
+            if ((d > 0) && (d < perceptionRadius + obs.r)) {
+                let diff = p5.Vector.sub(this.headPos, obs.pos);
+                diff.normalize();
+                diff.div(d);
+                sum.add(diff);
+                count++;
+            }
+        }
+        if (count > 0) {
+            sum.div(count);
+            sum.setMag(this.maxSpeed);
+            let steer = p5.Vector.sub(sum, this.vel);
+            steer.limit(this.maxForce * 2.0); // Allow for strong turns
+            return steer;
+        }
+        return createVector(0, 0);
+    }
+     */
+
+    // An improved AVOID function that uses tangent method to prevent getting stuck on corners
+    // attempts to steer "around" obstacles by choosing a tangent force aligned with the target
+    avoid(obstacles, target) {
+        // How far ahead the enemy "looks" for obstacles
+        let perceptionRadius = this.r * 5; // Increased perception
+        let sum = createVector(0, 0);
+        let count = 0;
+
+        // The "goal" direction, for reference
+        let seekDirection = p5.Vector.sub(target, this.headPos); // Use headPos
+        seekDirection.normalize();
+
+        for (let obs of obstacles) {
+            let d = p5.Vector.dist(this.headPos, obs.pos); // Use headPos
+
+            // If the obstacle is within our perception radius
+            if ((d > 0) && (d < perceptionRadius + obs.r)) {
+
+                // 1. Base Repulsion Force (points directly away from obstacle)
+                let repel = p5.Vector.sub(this.headPos, obs.pos); // Use headPos
+                repel.normalize();
+
+                // 2. Calculate the two perpendicular "sliding" forces
+                let tangent1 = createVector(-repel.y, repel.x);
+                let tangent2 = createVector(repel.y, -repel.x);
+
+                // 3. Find which tangent is "better"
+                let tangentToUse;
+                if (tangent1.dot(seekDirection) > tangent2.dot(seekDirection)) {
+                    tangentToUse = tangent1;
+                } else {
+                    tangentToUse = tangent2;
+                }
+
+                // 4. Combine Repulsion + Tangent
+                tangentToUse.setMag(1.0);
+                repel.setMag(0.5);
+                let combinedForce = p5.Vector.add(tangentToUse, repel);
+
+                // 5. Weight by distance
+                let weight = (perceptionRadius - d) / perceptionRadius;
+                combinedForce.mult(weight * this.maxSpeed);
+
+                sum.add(combinedForce);
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            sum.div(count);
+            sum.setMag(this.maxSpeed);
+            let steer = p5.Vector.sub(sum, this.vel);
+            steer.limit(this.maxForce * 2.5);
+            return steer;
+        }
+        return createVector(0, 0);
     }
 
     show() {

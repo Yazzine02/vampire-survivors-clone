@@ -19,15 +19,17 @@ class Enemy {
         // --- AI DECISION MAKING ---
         let seekForce = this.seek(player.pos);
         let separateForce = this.separate(enemies);
-        let avoidForce = this.avoid(terrain);
+        let avoidForce = this.avoid(terrain, player.pos);
 
         // Weight the forces:
         // We want them to chase the player, but PRIORITY is personal space.
         seekForce.mult(1.0);
         separateForce.mult(2.0); // Stronger force to prevent overlapping
+        avoidForce.mult(3.0);    // Strongly avoid obstacles
 
         this.applyForce(seekForce);
         this.applyForce(separateForce);
+        this.applyForce(avoidForce)
 
         // --- PHYSICS ENGINE (Same as Bullet) ---
         this.vel.add(this.acc);
@@ -51,7 +53,7 @@ class Enemy {
 
     // 2. SEPARATE: The drive to not crowd neighbors
     separate(enemies) {
-        let desiredSeparation = this.r * 4; // Maintain a buffer zone
+        let desiredSeparation = this.r * 2; // Maintain a buffer zone
         let sum = createVector(0, 0);
         let count = 0;
 
@@ -79,11 +81,14 @@ class Enemy {
         }
         return createVector(0, 0);
     }
+    /*
+    // This is just like the avoid function we have seen in class, that i believe is not good enough
+    // basically because the enemy can get stuck on corners
     // 3. AVOID: The drive to not hit obstacles (terrain)
     avoid(obstacles) {
         // This perception radius should be larger than separation
         // It's how far ahead the enemy "looks" for obstacles
-        let perceptionRadius = this.r * 6;
+        let perceptionRadius = this.r * 3;
         let sum = createVector(0, 0);
         let count = 0;
         for (let obs of obstacles) {
@@ -94,7 +99,7 @@ class Enemy {
                 // Calculate a repulsion force, stronger the closer we are
                 let diff = p5.Vector.sub(this.pos, obs.pos);
                 diff.normalize();
-                diff.div(d); // Weigh by distance
+                diff.div(d); // Weigh by distance to get stronger avoidance when closer
                 sum.add(diff);
                 count++;
             }
@@ -104,6 +109,66 @@ class Enemy {
             sum.setMag(this.maxSpeed);
             let steer = p5.Vector.sub(sum, this.vel);
             steer.limit(this.maxForce * 2.0); // Allow for strong turns
+            return steer;
+        }
+        return createVector(0, 0);
+    }
+     */
+    // An improved AVOID function that uses tangent method to prevent getting stuck on corners
+    // attempts to steer "around" obstacles by choosing a tangent force aligned with the target
+    avoid(obstacles, target) {
+        // How far ahead the enemy "looks" for obstacles
+        let perceptionRadius = this.r * 5; // Increased perception
+        let sum = createVector(0, 0);
+        let count = 0;
+
+        // The "goal" direction, for reference
+        let seekDirection = p5.Vector.sub(target, this.pos);
+        seekDirection.normalize();
+
+        for (let obs of obstacles) {
+            let d = p5.Vector.dist(this.pos, obs.pos);
+
+            // If the obstacle is within our perception radius
+            if ((d > 0) && (d < perceptionRadius + obs.r)) {
+
+                // 1. Base Repulsion Force (points directly away from obstacle)
+                let repel = p5.Vector.sub(this.pos, obs.pos);
+                repel.normalize();
+
+                // 2. Calculate the two perpendicular "sliding" forces
+                let tangent1 = createVector(-repel.y, repel.x);
+                let tangent2 = createVector(repel.y, -repel.x);
+
+                // 3. Find which tangent is "better" (more aligned with seek direction)
+                // We use the dot product for this.
+                let tangentToUse;
+                if (tangent1.dot(seekDirection) > tangent2.dot(seekDirection)) {
+                    tangentToUse = tangent1;
+                } else {
+                    tangentToUse = tangent2;
+                }
+
+                // 4. Combine Repulsion + Tangent
+                // The tangent force "slides" us, the repel force "pushes" us.
+                tangentToUse.setMag(1.0); // Weight for tangent
+                repel.setMag(0.5);        // Weight for repulsion
+                let combinedForce = p5.Vector.add(tangentToUse, repel);
+
+                // 5. Weight by distance (stronger avoidance when closer)
+                let weight = (perceptionRadius - d) / perceptionRadius;
+                combinedForce.mult(weight * this.maxSpeed);
+
+                sum.add(combinedForce);
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            sum.div(count); // Average all avoidance forces
+            sum.setMag(this.maxSpeed); // Desired *velocity*
+            let steer = p5.Vector.sub(sum, this.vel);
+            steer.limit(this.maxForce * 2.5); // *Very* strong steering
             return steer;
         }
         return createVector(0, 0);
