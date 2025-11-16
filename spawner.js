@@ -27,7 +27,7 @@ class Spawner {
         let roll = random(); // Get a random number between 0 and 1
 
         if (roll < 0.1) { // 10% chance for a Worm
-            enemies.push(new WormEnemy(x, y));
+            //enemies.push(new WormEnemy(x, y));
         }else if (0.1<= roll < 0.25) {// 15% chance for a knight
             enemies.push(new Knight(x, y));
         }else if (0.25<= roll < 0.40){
@@ -36,9 +36,11 @@ class Spawner {
             enemies.push(new Monk(x, y));
         }else if (0.55<= roll < 0.70){
             enemies.push(new Archer(x, y));
-        }
-        else { // 90% chance for a regular Zombie
+        } else if(0.70<= roll < 0.85){
             enemies.push(new Enemy(x, y));
+        }
+        else {
+            enemies.push(new WormEnemy(x, y));
         }
     }
 }

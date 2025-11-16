@@ -13,6 +13,8 @@ class Enemy {
         this.isDead = false;
 
         this.img = enemyImg; // Default enemy image
+
+        this.largeurZoneEvitementDevantVaisseau = this.r / 2;
     }
 
     update(player, enemies, terrain) {
@@ -25,7 +27,7 @@ class Enemy {
         // We want them to chase the player, but PRIORITY is personal space.
         seekForce.mult(1.0);
         separateForce.mult(2.0); // Stronger force to prevent overlapping
-        avoidForce.mult(3.0);    // Strongly avoid obstacles
+        avoidForce.mult(5.0);    // Strongly avoid obstacles
 
         this.applyForce(seekForce);
         this.applyForce(separateForce);
@@ -81,98 +83,250 @@ class Enemy {
         }
         return createVector(0, 0);
     }
-    /*
     // This is just like the avoid function we have seen in class, that i believe is not good enough
     // basically because the enemy can get stuck on corners
     // 3. AVOID: The drive to not hit obstacles (terrain)
     avoid(obstacles) {
-        // This perception radius should be larger than separation
-        // It's how far ahead the enemy "looks" for obstacles
-        let perceptionRadius = this.r * 3;
-        let sum = createVector(0, 0);
-        let count = 0;
-        for (let obs of obstacles) {
-            let d = p5.Vector.dist(this.pos, obs.pos);
+        // calcul d'un vecteur "ahead" (capteur) devant le véhicule
+        let ahead = this.vel.copy();
+        // 30 frames "dans le futur".
+        // Note : Si la vitesse est très basse (0.5), 30 frames = 15 pixels.
+        // Vous pouvez augmenter le multiplicateur (ex: 60 ou 100) si vous trouvez
+        // que les ennemis réagissent trop tard.
+        ahead.mult(30);
 
-            // If the obstacle is within our perception radius
-            if ((d > 0) && (d < perceptionRadius + obs.r)) {
-                // Calculate a repulsion force, stronger the closer we are
-                let diff = p5.Vector.sub(this.pos, obs.pos);
-                diff.normalize();
-                diff.div(d); // Weigh by distance to get stronger avoidance when closer
-                sum.add(diff);
-                count++;
+        //on calcule ahead2, deux fois plus petit
+        let ahead2 = ahead.copy();
+        ahead2.mult(0.5);
+
+        if (Enemy.debug) {
+            this.drawVector(this.pos, ahead, "yellow");
+            this.drawVector(this.pos, ahead2, "purple");
+        }
+
+        // Calcul des coordonnées du point au bout de ahead
+        let pointAuBoutDeAhead = this.pos.copy().add(ahead);
+        let pointAuBoutDeAhead2 = this.pos.copy().add(ahead2);
+
+        // Detection de l'obstacle le plus proche
+        let obstacleLePlusProche = this.getObstacleLePlusProche(obstacles);
+
+        // Si pas d'obstacle, on renvoie un vecteur nul
+        if (obstacleLePlusProche == undefined) {
+            return createVector(0, 0);
+        }
+
+        // On calcule la distance entre le cercle et le bout du vecteur ahead
+        let distance1 = pointAuBoutDeAhead.dist(obstacleLePlusProche.pos);
+        let distance2 = pointAuBoutDeAhead2.dist(obstacleLePlusProche.pos);
+        let distance = min(distance1, distance2);
+
+        if (Enemy.debug) {
+            // On dessine le point au bout du vecteur ahead pour debugger
+            push();
+            fill("red");
+            circle(pointAuBoutDeAhead.x, pointAuBoutDeAhead.y, 10);
+            fill("blue");
+            circle(pointAuBoutDeAhead2.x, pointAuBoutDeAhead2.y, 10);
+            pop();
+
+            // On dessine la zone d'évitement
+            push();
+            stroke(100, 100);
+            strokeWeight(this.largeurZoneEvitementDevantVaisseau);
+            line(this.pos.x, this.pos.y, pointAuBoutDeAhead.x, pointAuBoutDeAhead.y);
+            pop();
+        }
+
+        // si la distance est < rayon de l'obstacle + largeur zone + rayon ennemi
+        if (distance < obstacleLePlusProche.r + this.largeurZoneEvitementDevantVaisseau + this.r) {
+            // collision possible 
+
+            // calcul de la force d'évitement. C'est un vecteur qui va
+            // du centre de l'obstacle vers le point au bout du vecteur ahead
+            let force;
+            if (distance1 < distance2) {
+                force = p5.Vector.sub(pointAuBoutDeAhead, obstacleLePlusProche.pos);
+            } else {
+                force = p5.Vector.sub(pointAuBoutDeAhead2, obstacleLePlusProche.pos);
             }
+
+            if (Enemy.debug) {
+                this.drawVector(obstacleLePlusProche.pos, force, "yellow");
+            }
+
+            // Pilotage :
+            // force est la vitesse désirée
+            force.setMag(this.maxSpeed);
+            // force = vitesse désirée - vitesse courante
+            force.sub(this.vel);
+            // on limite cette force à la longueur maxForce
+            force.limit(this.maxForce);
+            return force;
+        } else {
+            // pas de collision possible
+            return createVector(0, 0);
         }
-        if (count > 0) {
-            sum.div(count); // Average direction
-            sum.setMag(this.maxSpeed);
-            let steer = p5.Vector.sub(sum, this.vel);
-            steer.limit(this.maxForce * 2.0); // Allow for strong turns
-            return steer;
-        }
-        return createVector(0, 0);
     }
-     */
+    getObstacleLePlusProche(obstacles) {
+        let plusPetiteDistance = 100000000;
+        let obstacleLePlusProche = undefined;
+
+        // Assurez-vous que 'obstacles' est bien un tableau
+        if (!Array.isArray(obstacles)) {
+            console.error("getObstacleLePlusProche: 'obstacles' n'est pas un tableau.");
+            return undefined;
+        }
+
+        obstacles.forEach(o => {
+            // Je calcule la distance entre le vaisseau et l'obstacle
+            const distance = this.pos.dist(o.pos);
+
+            if (distance < plusPetiteDistance) {
+                plusPetiteDistance = distance;
+                obstacleLePlusProche = o;
+            }
+        });
+
+        return obstacleLePlusProche;
+    }
+    /*
     // An improved AVOID function that uses tangent method to prevent getting stuck on corners
     // attempts to steer "around" obstacles by choosing a tangent force aligned with the target
     avoid(obstacles, target) {
-        // How far ahead the enemy "looks" for obstacles
-        let perceptionRadius = this.r * 5; // Increased perception
-        let sum = createVector(0, 0);
-        let count = 0;
+        let perceptionRadius = this.r * 5;
+        let strongestAvoidanceForce = createVector(0, 0);
+        let strongestTangent = createVector(0, 0);
 
-        // The "goal" direction, for reference
-        let seekDirection = p5.Vector.sub(target, this.pos);
-        seekDirection.normalize();
+        let seekDirection = p5.Vector.sub(target, this.pos).normalize();
+
+        // --- ! MODIFIED "DECIDER" LOGIC ! ---
+        let decider;
+        if (this.stickyTangent.magSq() > 0) {
+            // 1. We have a "locked" choice. Use it.
+            decider = this.stickyTangent;
+        } else if (this.vel.magSq() > 1) {
+            // 2. We are moving. Use momentum.
+            decider = this.vel.copy().normalize();
+        } else {
+            // 3. We are stuck. Use seek direction.
+            decider = seekDirection;
+        }
+        // ---
 
         for (let obs of obstacles) {
             let d = p5.Vector.dist(this.pos, obs.pos);
 
-            // If the obstacle is within our perception radius
             if ((d > 0) && (d < perceptionRadius + obs.r)) {
-
-                // 1. Base Repulsion Force (points directly away from obstacle)
-                let repel = p5.Vector.sub(this.pos, obs.pos);
-                repel.normalize();
-
-                // 2. Calculate the two perpendicular "sliding" forces
+                let repel = p5.Vector.sub(this.pos, obs.pos).normalize();
                 let tangent1 = createVector(-repel.y, repel.x);
                 let tangent2 = createVector(repel.y, -repel.x);
 
-                // 3. Find which tangent is "better" (more aligned with seek direction)
-                // We use the dot product for this.
+                // Find which tangent is "better" using our stable 'decider'
                 let tangentToUse;
-                if (tangent1.dot(seekDirection) > tangent2.dot(seekDirection)) {
+                if (tangent1.dot(decider) > tangent2.dot(decider)) {
                     tangentToUse = tangent1;
                 } else {
                     tangentToUse = tangent2;
                 }
 
-                // 4. Combine Repulsion + Tangent
-                // The tangent force "slides" us, the repel force "pushes" us.
-                tangentToUse.setMag(1.0); // Weight for tangent
-                repel.setMag(0.5);        // Weight for repulsion
+                tangentToUse.setMag(1.0);
+                repel.setMag(0.5);
                 let combinedForce = p5.Vector.add(tangentToUse, repel);
 
-                // 5. Weight by distance (stronger avoidance when closer)
                 let weight = (perceptionRadius - d) / perceptionRadius;
                 combinedForce.mult(weight * this.maxSpeed);
 
-                sum.add(combinedForce);
-                count++;
+                if (combinedForce.magSq() > strongestAvoidanceForce.magSq()) {
+                    strongestAvoidanceForce = combinedForce;
+                    // --- ! NEW ! ---
+                    // Remember the tangent associated with this strongest force
+                    strongestTangent = tangentToUse;
+                }
             }
         }
 
-        if (count > 0) {
-            sum.div(count); // Average all avoidance forces
-            sum.setMag(this.maxSpeed); // Desired *velocity*
-            let steer = p5.Vector.sub(sum, this.vel);
-            steer.limit(this.maxForce * 2.5); // *Very* strong steering
+
+        if (strongestAvoidanceForce.magSq() > 0) {
+            // --- ! "LOCK IN" THE CHOICE ! ---
+            this.stickyTangent = strongestTangent; // "Lock" this tangent
+
+            strongestAvoidanceForce.setMag(this.maxSpeed);
+            let steer = p5.Vector.sub(strongestAvoidanceForce, this.vel);
+
+            // --- ! MODIFIED ! ---
+            // As requested, a *VERY* powerful steering force
+            steer.limit(this.maxForce * 10.0);
+
             return steer;
         }
-        return createVector(0, 0);
+
+        // --- ! "UNLOCK" THE CHOICE ! ---
+        // No threats found, so clear the "lock"
+        this.stickyTangent = createVector(0, 0);
+        return createVector(0, 0); // No threats found
     }
+
+
+    // --- ! NEW ! ---
+    // (Add this new function for debugging)
+    debugDraw(obstacles, target) {
+        let perceptionRadius = this.r * 5;
+
+        // 1. Draw perception radius
+        push();
+        noFill();
+        stroke(100, 255, 100, 50); // Faint green
+        strokeWeight(1);
+        circle(this.pos.x, this.pos.y, perceptionRadius * 2);
+        pop();
+
+        let seekDirection = p5.Vector.sub(target, this.pos).normalize();
+        let decider = this.vel.copy();
+        if (decider.magSq() < 1) decider = seekDirection;
+        else decider.normalize();
+
+        // 2. Find the *single closest* obstacle for drawing
+        let closestObs = null;
+        let minDist = Infinity;
+        for (let obs of obstacles) {
+            let d = p5.Vector.dist(this.pos, obs.pos);
+            if (d < minDist && d < perceptionRadius + obs.r) {
+                minDist = d;
+                closestObs = obs;
+            }
+        }
+
+        // 3. If we have a close obstacle, draw all the forces
+        if (closestObs) {
+            push();
+            let repel = p5.Vector.sub(this.pos, closestObs.pos).normalize();
+            let tangent1 = createVector(-repel.y, repel.x);
+            let tangent2 = createVector(repel.y, -repel.x);
+
+            let tangentToUse;
+            if (tangent1.dot(decider) > tangent2.dot(decider)) {
+                tangentToUse = tangent1;
+            } else {
+                tangentToUse = tangent2;
+            }
+
+            // Helper to draw vectors
+            let drawVec = (v, color) => {
+                stroke(color);
+                strokeWeight(2);
+                line(this.pos.x, this.pos.y, this.pos.x + v.x * 50, this.pos.y + v.y * 50);
+            };
+
+            drawVec(repel, "red");       // Repulsion force (away)
+            drawVec(tangent1, "gray");   // Unused tangent
+            drawVec(tangent2, "gray");   // Unused tangent
+            drawVec(tangentToUse, "cyan"); // *The chosen tangent*
+
+            pop();
+        }
+    }
+     */
 
     show() {
         push();

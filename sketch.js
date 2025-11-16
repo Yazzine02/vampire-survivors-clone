@@ -6,9 +6,6 @@ let drops = [];   // Future use for XP/Gems
 let arrows = []; // For archer enemy projectiles
 // MAP DEFINITION
 let terrain=[]; // For future obstacles
-// brush radius for obstacle editor
-let debugRadius=50;
-
 
 function preload() {
     // Asset loading
@@ -22,6 +19,8 @@ function preload() {
     lancerImg = loadImage('assets/Lancer.png');
     archerImg = loadImage('assets/Archer.png');
     arrowImg = loadImage('assets/Arrow.png');
+    wormSegmentImg = loadImage('assets/WormSegment.png');
+    wormHeadImg = loadImage('assets/WormHead.png');
 }
 
 function setup() {
